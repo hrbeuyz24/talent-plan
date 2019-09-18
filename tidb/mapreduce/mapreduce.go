@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"hash/fnv"
 	"io/ioutil"
 	"log"
@@ -112,7 +113,38 @@ func (c *MRCluster) worker() {
 				// hint: don't encode results returned by ReduceF, and just output
 				// them into the destination file directly so that users can get
 				// results formatted as what they want.
-				panic("YOUR CODE HERE")
+				// panic("YOUR CODE HERE")
+
+				res := make(map[string][]string, 0)
+				for mapResultID := 0; mapResultID < t.nMap; mapResultID++ {
+					rpath := reduceName(t.dataDir, t.jobName, mapResultID, t.taskNumber)
+					mapResultFile, _ := os.Open(rpath)
+					enc := json.NewDecoder(mapResultFile)
+
+					for {
+						var kv KeyValue
+						err := enc.Decode(&kv)
+						if err != nil {
+							break
+						}
+						_, ok := res[kv.Key]
+						if !ok {
+							res[kv.Key] = make([]string, 0)
+						}
+						res[kv.Key] = append(res[kv.Key], kv.Value)
+					}
+				}
+
+				fileName := mergeName(t.dataDir, t.jobName, t.taskNumber)
+				f, buf := CreateFileAndBuf(fileName)
+				for key, values := range res {
+					value := t.reduceF(key, values)
+					_, err := fmt.Fprintf(buf, "%s", value)
+					if err != nil {
+						panic(err)
+					}
+				}
+				SafeClose(f, buf)
 			}
 			t.wg.Done()
 		case <-c.exit:
@@ -159,7 +191,33 @@ func (c *MRCluster) run(jobName, dataDir string, mapF MapF, reduceF ReduceF, map
 
 	// reduce phase
 	// YOUR CODE HERE :D
-	panic("YOUR CODE HERE")
+	//panic("YOUR CODE HERE")
+	reduceTasks := make([]*task, 0)
+	for reduceNum := 0; reduceNum < nReduce; reduceNum++ {
+		t := &task{
+			dataDir:    dataDir,
+			jobName:    jobName,
+			taskNumber: reduceNum,
+			phase:      reducePhase,
+			nReduce:    nReduce,
+			nMap:       nMap,
+			reduceF:    reduceF,
+		}
+		t.wg.Add(1)
+		reduceTasks = append(reduceTasks, t)
+		go func() { c.taskCh <- t }()
+
+	}
+
+	outFiles := make([]string, 0)
+	for i := 0; i < nReduce; i++ {
+		outFiles = append(outFiles, mergeName(dataDir, jobName, i))
+	}
+	for _, t := range reduceTasks {
+		t.wg.Wait()
+	}
+
+	notify <- outFiles
 }
 
 func ihash(s string) int {

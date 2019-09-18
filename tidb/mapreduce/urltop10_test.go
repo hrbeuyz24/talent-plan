@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path"
 	"runtime"
@@ -48,6 +50,9 @@ func TestExampleURLTop(t *testing.T) {
 }
 
 func TestURLTop(t *testing.T) {
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
 	rounds := URLTop10(GetMRCluster().NWorkers())
 	testURLTop(t, rounds)
 }
