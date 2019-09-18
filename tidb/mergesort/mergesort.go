@@ -5,6 +5,10 @@ import (
 	"sync"
 )
 
+var (
+	depth = 3
+)
+
 // merge merges two sorted arrays.
 func merge(src []int64) {
 	len := len(src)
@@ -67,5 +71,5 @@ func mergeSort(src []int64, deep int) {
 // MergeSort performs the merge sort algorithm.
 // Please supplement this function to accomplish the home work.
 func MergeSort(src []int64) {
-	mergeSort(src, 3)
+	mergeSort(src, depth)
 }
